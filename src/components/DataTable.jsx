@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
+  CircularProgress,
   Paper,
   Table,
   TableBody,
@@ -12,17 +13,22 @@ import {
   Typography
 } from '@mui/material';
 
-export default function DataTable({ title, rows = [], columns = [], pageSize = 5 }) {
+export default function DataTable({
+  title,
+  rows = [],
+  columns = [],
+  pageSize = 5,
+  loading = false,
+  emptyMessage = 'No records available.'
+}) {
   const [page, setPage] = useState(0);
-  const sortedRows = useMemo(() => rows || [], [rows]);
+  const [rowsPerPage, setRowsPerPage] = useState(pageSize);
 
-  const paginatedRows = useMemo(() => {
-    const start = page * pageSize;
-    const end = start + pageSize;
-    return sortedRows.slice(start, end);
-  }, [sortedRows, page, pageSize]);
+  useEffect(() => {
+    setPage(0);
+  }, [rows, rowsPerPage]);
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
+  const paginatedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid rgba(148, 163, 184, 0.2)', background: '#0f172a' }}>
@@ -37,7 +43,7 @@ export default function DataTable({ title, rows = [], columns = [], pageSize = 5
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell key={column.key} align={column.align || 'left'} sx={{ color: '#cbd5e1', fontWeight: 700 }}>
+                <TableCell key={column.key} align={column.align || 'left'} sx={{ color: '#cbd5e1', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   {column.label}
                 </TableCell>
               ))}
@@ -45,10 +51,16 @@ export default function DataTable({ title, rows = [], columns = [], pageSize = 5
           </TableHead>
 
           <TableBody>
-            {paginatedRows.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={24} />
+                </TableCell>
+              </TableRow>
+            ) : paginatedRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} align="center" sx={{ color: '#94a3b8', py: 4 }}>
-                  No records available.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
@@ -69,11 +81,12 @@ export default function DataTable({ title, rows = [], columns = [], pageSize = 5
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
         <TablePagination
           component="div"
-          count={sortedRows.length}
+          count={rows.length}
           page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={pageSize}
-          rowsPerPageOptions={[pageSize]}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(event) => setRowsPerPage(Number(event.target.value))}
+          rowsPerPageOptions={[5, 10, 25]}
           sx={{ color: '#cbd5e1' }}
         />
       </Box>

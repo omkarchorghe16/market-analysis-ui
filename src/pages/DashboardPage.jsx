@@ -12,6 +12,7 @@ import {
 import { ArrowForward, BarChart, Business, Inventory } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
+import { getApiErrorMessage } from '../api/errors';
 
 export default function DashboardPage() {
   const [health, setHealth] = useState('');
@@ -34,7 +35,7 @@ export default function DashboardPage() {
         setSectorCount(Array.isArray(sectorsRes.data) ? sectorsRes.data.length : 0);
         setStockCount(Array.isArray(stocksRes.data) ? stocksRes.data.length : 0);
       } catch (err) {
-        setError(err?.response?.data || 'Unable to load dashboard summary.');
+        setError(getApiErrorMessage(err, 'Unable to load dashboard summary.'));
       } finally {
         setLoading(false);
       }
