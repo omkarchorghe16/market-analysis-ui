@@ -1,0 +1,219 @@
+import { useEffect, useState } from 'react';
+import { Alert, Box, Button, Grid, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import api from '../api/client';
+import DataTable from '../components/DataTable';
+
+export default function StocksPage() {
+  const [sectors, setSectors] = useState([]);
+  const [stocks, setStocks] = useState([]);
+  const [selectedSector, setSelectedSector] = useState('');
+  const [tickerFilter, setTickerFilter] = useState('');
+  const [form, setForm] = useState({ ticker: '', sectorId: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [bulkText, setBulkText] = useState('AAPL, MSFT, NVDA');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadSectors = async () => {
+    const response = await api.get('/sectors');
+    setSectors(response.data || []);
+  };
+
+  const loadStocks = async () => {
+    const params = {};
+    if (selectedSector) params.sectorId = Number(selectedSector);
+    if (tickerFilter.trim()) params.ticker = tickerFilter.trim();
+
+    const response = await api.get('/stocks', { params });
+    setStocks(response.data || []);
+  };
+
+  useEffect(() => {
+    loadSectors();
+    loadStocks();
+  }, []);
+
+  useEffect(() => {
+    loadStocks();
+  }, [selectedSector, tickerFilter]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    try {
+      setLoading(true);
+      setError('');
+      const payload = { ...form, sectorId: Number(form.sectorId) };
+      if (editingId) {
+        await api.put(`/stocks/${editingId}`, payload);
+      } else {
+        await api.post('/stocks', payload);
+      }
+      setForm({ ticker: '', sectorId: '' });
+      setEditingId(null);
+      await loadStocks();
+    } catch (err) {
+      setError(err?.response?.data || 'Unable to save stock.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkCreate = async () => {
+    const matches = bulkText
+      .split(/[\n,]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!matches.length || !form.sectorId) {
+      setError('Please enter at least one ticker and choose a sector.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      await api.post('/stocks/bulk', { sectorId: Number(form.sectorId), tickers: matches });
+      setBulkText('');
+      await loadStocks();
+    } catch (err) {
+      setError(err?.response?.data || 'Unable to create bulk stocks.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (stock) => {
+    setEditingId(stock.id);
+    setForm({ ticker: stock.ticker || '', sectorId: stock.sectorId ? String(stock.sectorId) : '' });
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this stock?')) return;
+    try {
+      await api.delete(`/stocks/${id}`);
+      await loadStocks();
+    } catch (err) {
+      setError(err?.response?.data || 'Unable to delete stock.');
+    }
+  };
+
+  const columns = [
+    { key: 'id', label: 'ID' },
+    { key: 'ticker', label: 'Ticker' },
+    { key: 'sectorName', label: 'Sector' },
+    { key: 'createdAt', label: 'Created At', render: (row) => row.createdAt ? new Date(row.createdAt).toLocaleString() : '—' },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row) => (
+        <Stack direction="row" spacing={1}>
+          <Button size="small" variant="outlined" onClick={() => handleEdit(row)}>Edit</Button>
+          <Button size="small" variant="contained" color="error" onClick={() => handleDelete(row.id)}>Delete</Button>
+        </Stack>
+      )
+    }
+  ];
+
+  return (
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, color: '#f8fafc', mb: 3 }}>Stocks</Typography>
+      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={5}>
+          <Box component="form" onSubmit={handleSubmit} sx={{ background: '#0f172a', p: 3, borderRadius: 3, border: '1px solid rgba(148,163,184,0.18)' }}>
+            <Typography variant="h6" sx={{ color: '#f8fafc', mb: 2 }}>{editingId ? 'Edit Stock' : 'Add Stock'}</Typography>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="Ticker"
+                value={form.ticker}
+                onChange={(event) => setForm({ ...form, ticker: event.target.value })}
+                sx={{ '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+              />
+              <TextField
+                select
+                fullWidth
+                label="Sector"
+                value={form.sectorId}
+                onChange={(event) => setForm({ ...form, sectorId: event.target.value })}
+                sx={{ '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+              >
+                {sectors.map((sector) => (
+                  <MenuItem key={sector.id} value={sector.id}>{sector.sectorName}</MenuItem>
+                ))}
+              </TextField>
+              <Stack direction="row" spacing={2}>
+                <Button type="submit" variant="contained" disabled={loading || !form.ticker.trim() || !form.sectorId}>
+                  {editingId ? 'Update' : 'Add'}
+                </Button>
+                {editingId ? (
+                  <Button variant="outlined" onClick={() => { setEditingId(null); setForm({ ticker: '', sectorId: '' }); }}>
+                    Cancel
+                  </Button>
+                ) : null}
+              </Stack>
+            </Stack>
+          </Box>
+        </Grid>
+
+        <Grid item xs={12} md={7}>
+          <Box sx={{ background: '#0f172a', p: 3, borderRadius: 3, border: '1px solid rgba(148,163,184,0.18)' }}>
+            <Typography variant="h6" sx={{ color: '#f8fafc', mb: 2 }}>Bulk add</Typography>
+            <Stack spacing={2}>
+              <TextField
+                select
+                fullWidth
+                label="Target sector"
+                value={form.sectorId}
+                onChange={(event) => setForm({ ...form, sectorId: event.target.value })}
+                sx={{ '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+              >
+                {sectors.map((sector) => (
+                  <MenuItem key={sector.id} value={sector.id}>{sector.sectorName}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                label="Tickers (comma or newline separated)"
+                value={bulkText}
+                onChange={(event) => setBulkText(event.target.value)}
+                sx={{ '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+              />
+              <Button variant="contained" color="secondary" onClick={handleBulkCreate} disabled={loading || !form.sectorId}>
+                Add bulk stocks
+              </Button>
+            </Stack>
+          </Box>
+        </Grid>
+      </Grid>
+
+      <Box sx={{ background: '#0f172a', p: 3, borderRadius: 3, border: '1px solid rgba(148,163,184,0.18)', mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+          <TextField
+            select
+            label="Filter by sector"
+            value={selectedSector}
+            onChange={(event) => setSelectedSector(event.target.value)}
+            sx={{ minWidth: 220, '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+          >
+            <MenuItem value="">All sectors</MenuItem>
+            {sectors.map((sector) => (
+              <MenuItem key={sector.id} value={sector.id}>{sector.sectorName}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Filter by ticker"
+            value={tickerFilter}
+            onChange={(event) => setTickerFilter(event.target.value)}
+            sx={{ minWidth: 220, '& .MuiInputBase-root': { color: '#f8fafc' }, '& .MuiInputLabel-root': { color: '#cbd5e1' } }}
+          />
+        </Stack>
+      </Box>
+
+      <DataTable title="Stock list" rows={stocks} columns={columns} pageSize={6} />
+    </Box>
+  );
+}

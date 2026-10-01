@@ -1,0 +1,82 @@
+import { useMemo, useState } from 'react';
+import {
+  Box,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TablePagination,
+  TableRow,
+  Typography
+} from '@mui/material';
+
+export default function DataTable({ title, rows = [], columns = [], pageSize = 5 }) {
+  const [page, setPage] = useState(0);
+  const sortedRows = useMemo(() => rows || [], [rows]);
+
+  const paginatedRows = useMemo(() => {
+    const start = page * pageSize;
+    const end = start + pageSize;
+    return sortedRows.slice(start, end);
+  }, [sortedRows, page, pageSize]);
+
+  const handleChangePage = (_, newPage) => setPage(newPage);
+
+  return (
+    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: '1px solid rgba(148, 163, 184, 0.2)', background: '#0f172a' }}>
+      {title ? (
+        <Typography variant="h6" sx={{ mb: 2, color: '#f8fafc', fontWeight: 600 }}>
+          {title}
+        </Typography>
+      ) : null}
+
+      <TableContainer>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <TableCell key={column.key} align={column.align || 'left'} sx={{ color: '#cbd5e1', fontWeight: 700 }}>
+                  {column.label}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {paginatedRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} align="center" sx={{ color: '#94a3b8', py: 4 }}>
+                  No records available.
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedRows.map((row, index) => (
+                <TableRow hover key={row.id ?? `${row.ticker ?? 'row'}-${index}`}>
+                  {columns.map((column) => (
+                    <TableCell key={`${column.key}-${row.id ?? index}`} align={column.align || 'left'} sx={{ color: '#e2e8f0' }}>
+                      {column.render ? column.render(row) : row[column.key] ?? '—'}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <TablePagination
+          component="div"
+          count={sortedRows.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={pageSize}
+          rowsPerPageOptions={[pageSize]}
+          sx={{ color: '#cbd5e1' }}
+        />
+      </Box>
+    </Paper>
+  );
+}

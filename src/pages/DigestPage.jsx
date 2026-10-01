@@ -1,0 +1,71 @@
+import { useState } from 'react';
+import { Alert, Box, Button, Card, CardContent, Grid, Typography } from '@mui/material';
+import api from '../api/client';
+
+export default function DigestPage() {
+  const [health, setHealth] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const runAction = async (endpoint, label) => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.post(endpoint);
+      setMessage(`${label}: ${response.data}`);
+      if (endpoint === '/digest/health') {
+        setHealth(response.data);
+      }
+    } catch (err) {
+      setError(err?.response?.data || `${label} failed.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box>
+      <Typography variant="h4" sx={{ fontWeight: 700, color: '#f8fafc', mb: 3 }}>Digest Operations</Typography>
+
+      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+      {message ? <Alert severity="success" sx={{ mb: 3 }}>{message}</Alert> : null}
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.18)', borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ color: '#f8fafc', mb: 2 }}>Daily digest</Typography>
+              <Button variant="contained" fullWidth onClick={() => runAction('/digest/run', 'Daily digest')} disabled={loading}>
+                Trigger /api/digest/run
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card sx={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.18)', borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ color: '#f8fafc', mb: 2 }}>Portfolio digest</Typography>
+              <Button variant="contained" fullWidth color="secondary" onClick={() => runAction('/digest/portfolio', 'Portfolio digest')} disabled={loading}>
+                Trigger /api/digest/portfolio
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card sx={{ background: '#0f172a', border: '1px solid rgba(148,163,184,0.18)', borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ color: '#f8fafc', mb: 2 }}>Health</Typography>
+              <Button variant="outlined" fullWidth onClick={() => runAction('/digest/health', 'Health check')} disabled={loading}>
+                Check /api/digest/health
+              </Button>
+              {health ? <Typography sx={{ color: '#cbd5e1', mt: 2 }}>{health}</Typography> : null}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+}
